@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { db } from '../db/database.js';
 import { getSyncStatus } from '../npm/npm.service.js';
+import { getCfSyncStatus } from '../cloudflare/cloudflare.service.js';
 
 export const healthRoutes: FastifyPluginAsync = async (fastify) => {
   // Liveness check for container orchestration
@@ -11,8 +12,8 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
   // Aggregated health metrics for KPI cards & donut gauges
   fastify.get('/api/v1/health/stats', async () => {
     const apps = db.prepare(`
-      SELECT id, is_ssl, forward_scheme, last_known_status, last_response_time_ms
-      FROM npm_applications
+      SELECT id, is_ssl, forward_scheme, forward_port, last_known_status, last_response_time_ms
+      FROM unified_applications
       WHERE is_enabled = 1
     `).all() as any[];
 
@@ -36,7 +37,20 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
     const standardWebPorts = apps.filter((a) => [80, 443, 8080, 8443].includes(a.forward_port)).length;
     const customPorts = totalApps - standardWebPorts;
 
-    const syncStatus = getSyncStatus();
+    const npmSyncStatus = getSyncStatus();
+    const cfSyncStatus = getCfSyncStatus();
+
+    // Combined sync status label & count
+    let combinedStatus = npmSyncStatus;
+    if (cfSyncStatus.status === 'connected') {
+      combinedStatus = {
+        ...npmSyncStatus,
+        hostCount: totalApps,
+        message: npmSyncStatus.status === 'connected'
+          ? `NPM (${npmSyncStatus.hostCount}) + Cloudflare (${cfSyncStatus.hostCount}) Active`
+          : `Cloudflare Connected (${cfSyncStatus.hostCount} hosts)`,
+      };
+    }
 
     return {
       totalApps,
@@ -53,9 +67,11 @@ export const healthRoutes: FastifyPluginAsync = async (fastify) => {
         customPorts,
       },
       healthRatio: totalApps > 0 ? Math.round((onlineApps / totalApps) * 100) : 100,
-      syncStatus,
+      syncStatus: combinedStatus,
+      cloudflareSyncStatus: cfSyncStatus,
     };
   });
+
 
   // Time-series history for the Latency Wave Chart
   fastify.get('/api/v1/health/history', async () => {

@@ -70,7 +70,66 @@ On initial startup, Gatekeeper automatically provisions the primary administrato
    - **Demo Mode Fallback:** When NPM is unconfigured or unreachable, Gatekeeper serves realistic homelab sample hosts (Grafana, Vaultwarden, Nextcloud, Plex, Home Assistant, Portainer, Uptime Kuma, NPM) so the UI is immediately functional.
    - **Homelab Permissive SSL:** Allows health checks and favicon scrapes across internal homelab domains with self-signed certificates (`STRICT_SSL=false`).
 
+5. **Cloudflare Tunnels Integration:**
+   - Autonomously extracts published hostnames and upstream target applications directly from Cloudflare Zero Trust Tunnels via Cloudflare API v4.
+   - **Unified Dashboard & Grouping:** Extracted applications merge into the same grid. When using **"Grouping: By Server"**, Cloudflare apps pointing to internal IPs group under the exact same server IP headers as your NPM hosts.
+
 ---
+
+## ☁️ Setting Up Cloudflare Tunnels
+
+To connect Gatekeeper to your Cloudflare Tunnels, open **Settings** (gear icon or user menu) → click the **Cloudflare Tunnels** tab. You will need your **Cloudflare Account ID** and an **API Token**.
+
+### 1. How to Find Your Cloudflare Account ID
+
+Cloudflare accounts have a 32-character hexadecimal Account ID. You can find it in either of two quick ways:
+
+#### Option A: Directly from your Browser URL (Fastest)
+1. Log in to your [Cloudflare Dashboard](https://dash.cloudflare.com/).
+2. Look at your browser's address bar. The URL will look like:
+   ```text
+   https://dash.cloudflare.com/a1b2c3d4e5f60718293a4b5c6d7e8f90
+   ```
+3. The 32-character string right after `dash.cloudflare.com/` is your **Account ID**. Copy that string.
+*(If you are in Cloudflare Zero Trust, the URL is `https://one.dash.cloudflare.com/<ACCOUNT_ID>/...` — the string after `one.dash.cloudflare.com/` is also your Account ID)*.
+
+#### Option B: From Any Domain Overview Sidebar
+1. In the [Cloudflare Dashboard](https://dash.cloudflare.com/), click on any of your active domains/websites.
+2. On the **Overview** page, scroll down the right-hand sidebar.
+3. Under the **API** section at the bottom right, find **Account ID** and click **Click to copy**.
+
+---
+
+### 2. How to Create or Use Your Cloudflare API Token
+
+Gatekeeper only needs **Read** access to your tunnels to discover your published ingress rules:
+
+1. In the top-right corner of the Cloudflare Dashboard, click your **User Profile icon** → select **My Profile**.
+2. In the left navigation menu, click **API Tokens** (or navigate directly to [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens)).
+3. Click **Create Token**.
+4. You can use either of the following:
+   - **Method 1 (Recommended - Scoped Custom Token):**
+     - Scroll down to **Custom Token** and click **Get started**.
+     - **Token name:** `Gatekeeper Tunnels Reader`
+     - **Permissions:**
+       - Select `Account` → `Cloudflare Tunnel` → `Read`.
+     - **Account Resources:**
+       - Select `Include` → `All accounts` (or select your specific account).
+     - Click **Continue to summary** → **Create Token**.
+   - **Method 2 (Read All Resources Token):**
+     - If you already created a token using the **Read all resources** template, that token already has the required permissions and works out of the box!
+5. Copy the generated token string. *(Note: Cloudflare only shows this once; Gatekeeper stores it securely encrypted using AES-256-GCM)*.
+
+---
+
+### 3. Connecting in Gatekeeper
+1. Open Gatekeeper → click **Settings** → **Cloudflare Tunnels**.
+2. Paste your **Account ID** and **API Token**.
+3. Click **Test Connection** — Gatekeeper will query your account and list your active tunnels.
+4. Under **Tunnel Scope**, choose **All Tunnels (Combined Ingress)** or pick an individual tunnel.
+5. Click **Save & Sync Hosts** (or **Import Apps Now**).
+6. Your published Cloudflare applications will instantly appear on your dashboard!
+
 
 ## ⚙️ Configuration Reference (`docker-compose.yml`)
 

@@ -14,6 +14,7 @@ export interface AppItem {
   responseTimeMs: number;
   lastCheckedAt: string | null;
   isHidden?: boolean;
+  source?: 'npm' | 'cloudflare';
 }
 
 export interface UserPreferences {
@@ -22,9 +23,20 @@ export interface UserPreferences {
   npmEndpoint: string | null;
   npmIdentity: string | null;
   hasSavedNpmSecret?: boolean;
+  cfAccountId?: string | null;
+  cfTunnelId?: string | null;
+  cfTunnelName?: string | null;
+  hasSavedCfToken?: boolean;
   cardOrder: string[];
   hiddenApps: string[];
   showAnalytics: boolean;
+}
+
+export interface CloudflareTunnel {
+  id: string;
+  name: string;
+  status: string;
+  created_at: string;
 }
 
 export interface User {
@@ -59,7 +71,14 @@ export interface HealthStats {
     message: string;
     hostCount: number;
   };
+  cloudflareSyncStatus?: {
+    lastSyncAt: string | null;
+    status: 'idle' | 'syncing' | 'connected' | 'error';
+    message: string;
+    hostCount: number;
+  };
 }
+
 
 export interface HealthSample {
   id: number;

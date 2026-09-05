@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Palette, Network, Users, ShieldCheck, KeyRound, Check, AlertCircle, Trash2, Plus, LogOut, RotateCcw } from 'lucide-react';
+import { X, User, Palette, Network, Users, ShieldCheck, KeyRound, Check, AlertCircle, Trash2, Plus, LogOut, RotateCcw, Cloud } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme, ThemeMode } from '../../context/ThemeContext';
 import { TwoFactorModal } from './TwoFactorModal';
@@ -7,7 +7,7 @@ import { TwoFactorModal } from './TwoFactorModal';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'profile' | 'theme' | 'npm' | 'users';
+  initialTab?: 'profile' | 'theme' | 'npm' | 'cloudflare' | 'users';
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, initialTab = 'profile' }) => {
@@ -16,8 +16,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
   const { user, refreshUser, logout } = useAuth();
   const { themeMode, setThemeMode } = useTheme();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'theme' | 'npm' | 'users'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'profile' | 'theme' | 'npm' | 'cloudflare' | 'users'>(initialTab);
   const [is2faModalOpen, setIs2faModalOpen] = useState(false);
+
 
   // Profile Form State
   const [displayName, setDisplayName] = useState(user?.displayName || '');
@@ -43,6 +44,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
       setNpmUser(user.preferences.npmIdentity || '');
     }
   }, [user?.preferences?.npmEndpoint, user?.preferences?.npmIdentity]);
+
+  // Cloudflare Tunnels State
+  const [cfAccountId, setCfAccountId] = useState(user?.preferences?.cfAccountId || '');
+  const [cfToken, setCfToken] = useState('');
+  const [cfTunnelId, setCfTunnelId] = useState(user?.preferences?.cfTunnelId || 'all');
+  const [cfTunnelName, setCfTunnelName] = useState(user?.preferences?.cfTunnelName || 'All Tunnels');
+  const [cfTunnelsList, setCfTunnelsList] = useState<any[]>([]);
+  const [cfTestResult, setCfTestResult] = useState<{ success: boolean; message: string; tunnels?: any[] } | null>(null);
+  const [isTestingCf, setIsTestingCf] = useState(false);
+  const [isSyncingCf, setIsSyncingCf] = useState(false);
+  const [isResettingCf, setIsResettingCf] = useState(false);
+
+  useEffect(() => {
+    if (user?.preferences?.cfAccountId !== undefined) {
+      setCfAccountId(user.preferences.cfAccountId || '');
+    }
+    if (user?.preferences?.cfTunnelId !== undefined) {
+      setCfTunnelId(user.preferences.cfTunnelId || 'all');
+    }
+    if (user?.preferences?.cfTunnelName !== undefined) {
+      setCfTunnelName(user.preferences.cfTunnelName || 'All Tunnels');
+    }
+  }, [user?.preferences?.cfAccountId, user?.preferences?.cfTunnelId, user?.preferences?.cfTunnelName]);
+
 
   // User Management State (Admin only)
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -182,6 +207,87 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
     }
   };
 
+  const handleTestCf = async () => {
+    setIsTestingCf(true);
+    setCfTestResult(null);
+    try {
+      const res = await fetch('/api/v1/cloudflare/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ accountId: cfAccountId, apiToken: cfToken }),
+      });
+      const data = await res.json();
+      setCfTestResult(data);
+      if (data.success && Array.isArray(data.tunnels)) {
+        setCfTunnelsList(data.tunnels);
+      }
+    } catch (err: any) {
+      setCfTestResult({ success: false, message: err.message });
+    } finally {
+      setIsTestingCf(false);
+    }
+  };
+
+  const handleSaveAndSyncCf = async () => {
+    setIsSyncingCf(true);
+    setCfTestResult(null);
+    try {
+      const res = await fetch('/api/v1/cloudflare/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          accountId: cfAccountId,
+          apiToken: cfToken,
+          tunnelId: cfTunnelId,
+          tunnelName: cfTunnelName,
+        }),
+      });
+      const data = await res.json();
+      if (data.status === 'connected') {
+        setCfTestResult({
+          success: true,
+          message: data.message || `Successfully connected! Synchronized ${data.hostCount} hosts from Cloudflare.`,
+        });
+        await refreshUser();
+        window.dispatchEvent(new Event('gatekeeper:sync-success'));
+      } else {
+        setCfTestResult({ success: false, message: data.message || 'Synchronization failed' });
+      }
+    } catch (err: any) {
+      setCfTestResult({ success: false, message: err.message });
+    } finally {
+      setIsSyncingCf(false);
+    }
+  };
+
+  const handleResetCf = async () => {
+    if (!confirm('Are you sure you want to clear your saved Cloudflare Tunnels configuration?')) return;
+    setIsResettingCf(true);
+    setCfTestResult(null);
+    try {
+      const res = await fetch('/api/v1/cloudflare/reset', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        setCfAccountId('');
+        setCfToken('');
+        setCfTunnelId('all');
+        setCfTunnelName('All Tunnels');
+        setCfTunnelsList([]);
+        setCfTestResult({ success: true, message: 'Cloudflare connection settings cleared.' });
+        await refreshUser();
+        window.dispatchEvent(new Event('gatekeeper:sync-success'));
+      }
+    } catch (err: any) {
+      setCfTestResult({ success: false, message: `Failed to reset: ${err.message}` });
+    } finally {
+      setIsResettingCf(false);
+    }
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setUserMgmtMessage(null);
@@ -225,6 +331,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
   const hasSavedSecret = Boolean(user?.preferences?.hasSavedNpmSecret);
   const canAuthenticateNpm = Boolean(npmHost.trim() && npmUser.trim() && (npmPass.trim() || hasSavedSecret));
 
+  const hasSavedCfToken = Boolean(user?.preferences?.hasSavedCfToken);
+  const canAuthenticateCf = Boolean(cfAccountId.trim() && (cfToken.trim() || hasSavedCfToken));
+
+
   return (
     <>
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -266,6 +376,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
               <Network className="w-4 h-4" />
               <span>NPM Integration</span>
             </button>
+            <button
+              onClick={() => setActiveTab('cloudflare')}
+              className={`py-3 flex items-center gap-1.5 border-b-2 transition-all ${
+                activeTab === 'cloudflare' ? 'border-accent-primary text-text-primary font-bold' : 'border-transparent hover:text-white'
+              }`}
+            >
+              <Cloud className="w-4 h-4 text-[#f38020]" />
+              <span>Cloudflare Tunnels</span>
+            </button>
+
             {user?.role === 'admin' && (
               <button
                 onClick={() => setActiveTab('users')}
@@ -578,8 +698,156 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
               </div>
             )}
 
+            {/* Tab: Cloudflare Tunnels */}
+            {activeTab === 'cloudflare' && (
+              <div className="flex flex-col gap-4">
+                <div>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Cloud className="w-4 h-4 text-[#f38020]" />
+                    <span>Cloudflare Tunnels Upstream</span>
+                  </h4>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    Connect Gatekeeper to your Cloudflare Zero Trust account to autonomously synchronize published applications from Cloudflare Tunnels.
+                  </p>
+                </div>
+
+                {cfTestResult && (
+                  <div
+                    className={`p-3.5 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 border ${
+                      cfTestResult.success
+                        ? 'bg-status-healthy/10 text-status-healthy border-status-healthy/30'
+                        : 'bg-status-critical/10 text-status-critical border-status-critical/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {cfTestResult.success ? <Check className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                      <span className="font-medium leading-relaxed">{cfTestResult.message}</span>
+                    </div>
+                    {cfTestResult.success && !cfTestResult.message.includes('Synchronized') && (
+                      <button
+                        type="button"
+                        onClick={handleSaveAndSyncCf}
+                        disabled={isSyncingCf}
+                        className="self-start sm:self-auto px-3.5 py-1.5 bg-status-healthy hover:bg-status-healthy/90 text-white font-bold rounded-lg shadow-md transition-all shrink-0 flex items-center gap-1"
+                      >
+                        <span>{isSyncingCf ? 'Importing...' : 'Import Apps Now'}</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div className="bg-card-dark p-4 rounded-xl border border-border-subtle flex flex-col gap-3">
+                  <div>
+                    <label className="text-xs text-text-muted block mb-1">
+                      Cloudflare Account ID
+                      <span className="ml-1 text-[10px] text-text-muted/80">(From Cloudflare dashboard right sidebar)</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 7c94b301a2c3d4e5f60718293a4b5c6d"
+                      value={cfAccountId}
+                      onChange={(e) => setCfAccountId(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-surface-dark border border-border-subtle rounded-xl text-xs text-text-primary focus:outline-none focus:border-border-focus font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-text-muted block mb-1">
+                      API Token
+                      <span className="ml-1 text-[10px] text-text-muted/80">(Requires Account &gt; Cloudflare Tunnel: Read)</span>
+                    </label>
+                    <input
+                      type="password"
+                      placeholder={hasSavedCfToken ? '••••••••••••••••••••••••••••••••' : 'Cloudflare API Token'}
+                      value={cfToken}
+                      onChange={(e) => setCfToken(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-surface-dark border border-border-subtle rounded-xl text-xs text-text-primary focus:outline-none focus:border-border-focus"
+                    />
+                    {hasSavedCfToken && !cfToken && (
+                      <span className="text-[11px] text-status-healthy mt-1 flex items-center gap-1 font-medium">
+                        <Check className="w-3 h-3" />
+                        <span>Saved API token active. Leave blank to keep existing token.</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-text-muted block mb-1">
+                      Tunnel Scope
+                    </label>
+                    <select
+                      value={cfTunnelId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCfTunnelId(val);
+                        if (val === 'all') {
+                          setCfTunnelName('All Tunnels');
+                        } else {
+                          const matched = cfTunnelsList.find((t) => t.id === val);
+                          setCfTunnelName(matched?.name || val);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-surface-dark border border-border-subtle rounded-xl text-xs text-text-primary focus:outline-none focus:border-border-focus"
+                    >
+                      <option value="all">All Tunnels (Combined Ingress)</option>
+                      {cfTunnelsList.map((tunnel) => (
+                        <option key={tunnel.id} value={tunnel.id}>
+                          {tunnel.name} ({tunnel.status})
+                        </option>
+                      ))}
+                    </select>
+                    {cfTunnelsList.length === 0 && (
+                      <span className="text-[10px] text-text-muted mt-1 block">
+                        Click "Test Connection" to fetch active tunnels under this account.
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-3 pt-3 border-t border-border-subtle/50">
+                    <button
+                      type="button"
+                      onClick={handleResetCf}
+                      disabled={isResettingCf || isTestingCf || isSyncingCf || (!cfAccountId && !hasSavedCfToken)}
+                      className="px-3 py-2 bg-surface-dark hover:bg-status-critical/10 hover:text-status-critical hover:border-status-critical/30 border border-border-subtle rounded-xl text-xs font-semibold text-text-muted disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
+                      title="Clear saved Cloudflare credentials and remove synced apps"
+                    >
+                      <RotateCcw className={`w-3.5 h-3.5 ${isResettingCf ? 'animate-spin' : ''}`} />
+                      <span>{isResettingCf ? 'Clearing...' : 'Clear Settings'}</span>
+                    </button>
+
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={handleTestCf}
+                        disabled={isTestingCf || isSyncingCf || !canAuthenticateCf}
+                        className="px-4 py-2 bg-surface-dark hover:bg-card-dark-hover border border-border-subtle rounded-xl text-xs font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isTestingCf ? 'Testing...' : 'Test Connection'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveAndSyncCf}
+                        disabled={isSyncingCf || isTestingCf || !canAuthenticateCf}
+                        className="px-5 py-2 bg-accent-primary hover:bg-accent-hover text-white text-xs font-semibold rounded-xl shadow-md shadow-accent-primary/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
+                      >
+                        <span>{isSyncingCf ? 'Synchronizing...' : 'Save & Sync Hosts'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-surface-dark/60 border border-border-subtle rounded-xl text-[11px] text-text-secondary leading-relaxed flex flex-col gap-1">
+                  <div className="font-semibold text-text-primary">Seamless Dashboard Integration:</div>
+                  <div>• Cloudflare ingress rules are automatically mapped with their hostname and internal upstream server IP.</div>
+                  <div>• In the dashboard, you can group applications <strong>"By Server"</strong> (target host IP) or <strong>"By Provider"</strong> (NPM vs Cloudflare).</div>
+                  <div>• Filter search also accepts <code>cf</code>, <code>cloudflare</code>, or <code>npm</code> to quickly isolate applications by gateway.</div>
+                </div>
+              </div>
+            )}
+
             {/* Tab 4: User Management (Admin Only) */}
             {activeTab === 'users' && user?.role === 'admin' && (
+
               <div className="flex flex-col gap-6">
                 {userMgmtMessage && (
                   <div className="p-3 bg-card-dark border border-border-subtle rounded-xl text-xs text-white">

@@ -13,13 +13,21 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
     const decoded = verifyJwtToken(cookie);
     if (!decoded) return reply.status(401).send({ error: 'Unauthorized' });
 
-    const { themeMode, customThemeJson, showAnalytics, npmEndpoint, npmIdentity, npmSecret } = request.body as {
+    const {
+      themeMode, customThemeJson, showAnalytics,
+      npmEndpoint, npmIdentity, npmSecret,
+      cfAccountId, cfTunnelId, cfTunnelName, cfToken,
+    } = request.body as {
       themeMode?: string;
       customThemeJson?: string;
       showAnalytics?: boolean;
       npmEndpoint?: string;
       npmIdentity?: string;
       npmSecret?: string;
+      cfAccountId?: string;
+      cfTunnelId?: string;
+      cfTunnelName?: string;
+      cfToken?: string;
     };
 
     const current = getUserPreferences(decoded.sub);
@@ -29,17 +37,29 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
     const newNpmEndpoint = npmEndpoint !== undefined ? npmEndpoint : current?.npm_endpoint;
     const newNpmIdentity = npmIdentity !== undefined ? npmIdentity : current?.npm_identity;
     const newNpmSecretEncrypted = npmSecret ? encryptSecret(npmSecret) : current?.npm_secret_encrypted;
+    const newCfAccountId = cfAccountId !== undefined ? cfAccountId : current?.cf_account_id;
+    const newCfTunnelId = cfTunnelId !== undefined ? cfTunnelId : current?.cf_tunnel_id;
+    const newCfTunnelName = cfTunnelName !== undefined ? cfTunnelName : current?.cf_tunnel_name;
+    const newCfTokenEncrypted = cfToken ? encryptSecret(cfToken) : current?.cf_token_encrypted;
 
     db.prepare(`
       UPDATE user_preferences
-      SET theme_mode = ?, custom_theme_json = ?, show_analytics = ?, npm_endpoint = ?, npm_identity = ?, npm_secret_encrypted = ?
+      SET theme_mode = ?, custom_theme_json = ?, show_analytics = ?,
+          npm_endpoint = ?, npm_identity = ?, npm_secret_encrypted = ?,
+          cf_account_id = ?, cf_tunnel_id = ?, cf_tunnel_name = ?, cf_token_encrypted = ?
       WHERE user_id = ?
-    `).run(newThemeMode, newCustomThemeJson, newShowAnalytics, newNpmEndpoint, newNpmIdentity, newNpmSecretEncrypted, decoded.sub);
+    `).run(
+      newThemeMode, newCustomThemeJson, newShowAnalytics,
+      newNpmEndpoint, newNpmIdentity, newNpmSecretEncrypted,
+      newCfAccountId, newCfTunnelId, newCfTunnelName, newCfTokenEncrypted,
+      decoded.sub
+    );
 
     const user = findUserById(decoded.sub);
     const prefs = getUserPreferences(decoded.sub);
     return reply.send({ success: true, user: user ? sanitizeUser(user, prefs) : null });
   });
+
 
   // Update Profile (Display name, email)
   fastify.put('/api/v1/users/profile', async (request, reply) => {

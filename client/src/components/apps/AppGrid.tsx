@@ -14,7 +14,7 @@ import {
   sortableKeyboardCoordinates,
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Layers, CheckCircle2, AlertTriangle, Search, Server } from 'lucide-react';
+import { Layers, CheckCircle2, AlertTriangle, Search, Server, Globe, Cloud, Network } from 'lucide-react';
 import { AppItem } from '../../types';
 import { AppCard } from './AppCard';
 
@@ -38,11 +38,11 @@ export const AppGrid: React.FC<AppGridProps> = ({
   onOpenNpmSettings,
 }) => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'down'>('all');
-  const [groupBy, setGroupBy] = useState<'none' | 'server'>(() => {
-    return (localStorage.getItem('gatekeeper_apps_grouping') as 'none' | 'server') || 'none';
+  const [groupBy, setGroupBy] = useState<'none' | 'server' | 'provider'>(() => {
+    return (localStorage.getItem('gatekeeper_apps_grouping') as 'none' | 'server' | 'provider') || 'none';
   });
 
-  const handleSetGroupBy = (mode: 'none' | 'server') => {
+  const handleSetGroupBy = (mode: 'none' | 'server' | 'provider') => {
     setGroupBy(mode);
     try {
       localStorage.setItem('gatekeeper_apps_grouping', mode);
@@ -85,14 +85,18 @@ export const AppGrid: React.FC<AppGridProps> = ({
 
   // Filter apps based on search query and status filter
   const filteredApps = apps.filter((app) => {
+    const query = searchQuery.toLowerCase().trim();
     const matchesSearch =
-      searchQuery === '' ||
-      app.domainName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (app.customTitle && app.customTitle.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (app.customDescription && app.customDescription.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      app.forwardHost.toLowerCase().includes(searchQuery.toLowerCase());
+      query === '' ||
+      app.domainName.toLowerCase().includes(query) ||
+      (app.customTitle && app.customTitle.toLowerCase().includes(query)) ||
+      (app.customDescription && app.customDescription.toLowerCase().includes(query)) ||
+      app.forwardHost.toLowerCase().includes(query) ||
+      (app.source === 'cloudflare' && (query === 'cf' || 'cloudflare'.includes(query))) ||
+      (app.source === 'npm' && (query === 'npm' || 'nginx'.includes(query)));
 
     if (!matchesSearch) return false;
+
 
     if (statusFilter === 'online') return app.status === 'healthy';
     if (statusFilter === 'down') return app.status === 'down';
@@ -131,6 +135,47 @@ export const AppGrid: React.FC<AppGridProps> = ({
     }));
   }, [filteredApps, groupBy]);
 
+  // Group applications by Provider when "By Provider" is active
+  const providerGroups = useMemo(() => {
+    if (groupBy !== 'provider') return null;
+
+    const npmApps = filteredApps.filter((a) => a.source !== 'cloudflare');
+    const cfApps = filteredApps.filter((a) => a.source === 'cloudflare');
+
+    const groups: Array<{
+      key: 'npm' | 'cloudflare';
+      name: string;
+      badgeText: string;
+      apps: AppItem[];
+      onlineCount: number;
+      downCount: number;
+    }> = [];
+
+    if (npmApps.length > 0) {
+      groups.push({
+        key: 'npm',
+        name: 'Nginx Proxy Manager',
+        badgeText: 'NPM',
+        apps: npmApps,
+        onlineCount: npmApps.filter((a) => a.status === 'healthy').length,
+        downCount: npmApps.filter((a) => a.status === 'down').length,
+      });
+    }
+
+    if (cfApps.length > 0) {
+      groups.push({
+        key: 'cloudflare',
+        name: 'Cloudflare Tunnels',
+        badgeText: 'Cloudflare',
+        apps: cfApps,
+        onlineCount: cfApps.filter((a) => a.status === 'healthy').length,
+        downCount: cfApps.filter((a) => a.status === 'down').length,
+      });
+    }
+
+    return groups;
+  }, [filteredApps, groupBy]);
+
   return (
     <section className="flex flex-col gap-6">
       {/* Grid Subheader, Grouping Selector & Filters */}
@@ -148,11 +193,16 @@ export const AppGrid: React.FC<AppGridProps> = ({
               {serverGroups.length} server{serverGroups.length !== 1 ? 's' : ''}
             </span>
           )}
+          {groupBy === 'provider' && providerGroups && (
+            <span className="text-xs bg-accent-primary/10 border border-accent-primary/25 px-2.5 py-0.5 rounded-full text-accent-hover font-semibold">
+              {providerGroups.length} provider{providerGroups.length !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
 
         {/* Controls: Grouping Selector and Status Filter Pills */}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Grouping Selector: None vs By Server */}
+          {/* Grouping Selector: None vs By Server vs By Provider */}
           <div className="flex items-center gap-1.5 bg-surface-dark border border-border-subtle p-1 rounded-xl text-xs">
             <span className="text-[10px] uppercase font-bold text-text-muted px-2 select-none tracking-wider">
               Grouping:
@@ -177,6 +227,17 @@ export const AppGrid: React.FC<AppGridProps> = ({
             >
               <Server className="w-3.5 h-3.5 text-accent-primary" />
               <span>By Server</span>
+            </button>
+            <button
+              onClick={() => handleSetGroupBy('provider')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-all ${
+                groupBy === 'provider'
+                  ? 'bg-card-dark text-text-primary shadow-sm border border-border-subtle'
+                  : 'text-text-muted hover:text-white'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 text-accent-primary" />
+              <span>By Provider</span>
             </button>
           </div>
 
@@ -297,6 +358,79 @@ export const AppGrid: React.FC<AppGridProps> = ({
               </div>
             </div>
           ))}
+        </div>
+      ) : groupBy === 'provider' && providerGroups ? (
+        /* Grouped by Upstream Provider (NPM vs Cloudflare) */
+        <div className="flex flex-col gap-8">
+          {providerGroups.map((group) => {
+            const isCf = group.key === 'cloudflare';
+            return (
+              <div key={group.key} className="flex flex-col gap-3">
+                {/* Provider Section Header Banner */}
+                <div
+                  className={`flex items-center justify-between px-4 py-2.5 bg-surface-dark/80 border rounded-xl backdrop-blur-sm ${
+                    isCf ? 'border-[#f38020]/30' : 'border-emerald-500/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-8 h-8 rounded-lg bg-card-dark border flex items-center justify-center shadow-sm ${
+                        isCf ? 'border-[#f38020]/40 text-[#f38020]' : 'border-emerald-500/40 text-emerald-400'
+                      }`}
+                    >
+                      {isCf ? <Cloud className="w-4 h-4" /> : <Network className="w-4 h-4" />}
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-bold text-sm text-text-primary tracking-wide">
+                        {group.name}
+                      </span>
+                      <span
+                        className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                          isCf
+                            ? 'bg-[#f38020]/15 text-[#f38020] border-[#f38020]/30'
+                            : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                        }`}
+                      >
+                        {group.badgeText}
+                      </span>
+                      <span className="text-[11px] font-semibold text-text-muted px-2 py-0.5 rounded-full bg-card-dark border border-border-subtle">
+                        {group.apps.length} service{group.apps.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Provider Online / Down Counts */}
+                  <div className="flex items-center gap-2 text-xs font-semibold">
+                    {group.onlineCount > 0 && (
+                      <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-status-healthy/15 text-status-healthy">
+                        <span className="w-1.5 h-1.5 rounded-full bg-status-healthy" />
+                        {group.onlineCount} online
+                      </span>
+                    )}
+                    {group.downCount > 0 && (
+                      <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-status-critical/15 text-status-critical">
+                        <span className="w-1.5 h-1.5 rounded-full bg-status-critical" />
+                        {group.downCount} down
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Grid of Applications for this Provider */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {group.apps.map((app) => (
+                    <AppCard
+                      key={app.id}
+                      app={app}
+                      onEdit={onEditApp}
+                      onRefetchIcon={onRefetchIcon}
+                      onHide={onHideApp}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
         /* Standard Flat Reorderable Grid (None) */

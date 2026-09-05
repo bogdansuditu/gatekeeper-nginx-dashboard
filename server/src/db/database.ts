@@ -88,6 +88,99 @@ export function initDatabase(): void {
       );
 
       CREATE INDEX IF NOT EXISTS idx_health_samples_ts ON health_samples(timestamp);
+
+      CREATE TABLE IF NOT EXISTS cloudflare_applications (
+          id TEXT PRIMARY KEY,
+          tunnel_id TEXT NOT NULL,
+          tunnel_name TEXT NULL,
+          domain_name TEXT NOT NULL,
+          forward_scheme TEXT NOT NULL,
+          forward_host TEXT NOT NULL,
+          forward_port INTEGER NOT NULL,
+          is_ssl INTEGER DEFAULT 1,
+          is_enabled INTEGER DEFAULT 1,
+          custom_title TEXT NULL,
+          custom_description TEXT NULL,
+          favicon_path TEXT NULL,
+          last_known_status TEXT DEFAULT 'unknown',
+          last_response_time_ms INTEGER DEFAULT 0,
+          last_checked_at DATETIME NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(tunnel_id, domain_name)
+      );
+
+      CREATE VIEW IF NOT EXISTS unified_applications AS
+      SELECT 
+          id, 'npm' as source, npm_host_id as source_id, domain_name,
+          forward_scheme, forward_host, forward_port, is_ssl, is_enabled,
+          custom_title, custom_description, favicon_path,
+          last_known_status, last_response_time_ms, last_checked_at
+      FROM npm_applications
+      UNION ALL
+      SELECT 
+          id, 'cloudflare' as source, tunnel_id as source_id, domain_name,
+          forward_scheme, forward_host, forward_port, is_ssl, is_enabled,
+          custom_title, custom_description, favicon_path,
+          last_known_status, last_response_time_ms, last_checked_at
+      FROM cloudflare_applications;
     `);
   }
+
+  // Execute incremental column migrations for existing SQLite databases safely
+  const migrations = [
+    `ALTER TABLE user_preferences ADD COLUMN cf_account_id TEXT NULL;`,
+    `ALTER TABLE user_preferences ADD COLUMN cf_token_encrypted TEXT NULL;`,
+    `ALTER TABLE user_preferences ADD COLUMN cf_tunnel_id TEXT NULL;`,
+    `ALTER TABLE user_preferences ADD COLUMN cf_tunnel_name TEXT NULL;`,
+  ];
+  for (const m of migrations) {
+    try {
+      db.exec(m);
+    } catch {
+      // Ignore if column already exists
+    }
+  }
+
+  // Ensure cloudflare_applications and unified_applications exist in case schema.sql was partially applied
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS cloudflare_applications (
+          id TEXT PRIMARY KEY,
+          tunnel_id TEXT NOT NULL,
+          tunnel_name TEXT NULL,
+          domain_name TEXT NOT NULL,
+          forward_scheme TEXT NOT NULL,
+          forward_host TEXT NOT NULL,
+          forward_port INTEGER NOT NULL,
+          is_ssl INTEGER DEFAULT 1,
+          is_enabled INTEGER DEFAULT 1,
+          custom_title TEXT NULL,
+          custom_description TEXT NULL,
+          favicon_path TEXT NULL,
+          last_known_status TEXT DEFAULT 'unknown',
+          last_response_time_ms INTEGER DEFAULT 0,
+          last_checked_at DATETIME NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(tunnel_id, domain_name)
+      );
+
+      CREATE VIEW IF NOT EXISTS unified_applications AS
+      SELECT 
+          id, 'npm' as source, npm_host_id as source_id, domain_name,
+          forward_scheme, forward_host, forward_port, is_ssl, is_enabled,
+          custom_title, custom_description, favicon_path,
+          last_known_status, last_response_time_ms, last_checked_at
+      FROM npm_applications
+      UNION ALL
+      SELECT 
+          id, 'cloudflare' as source, tunnel_id as source_id, domain_name,
+          forward_scheme, forward_host, forward_port, is_ssl, is_enabled,
+          custom_title, custom_description, favicon_path,
+          last_known_status, last_response_time_ms, last_checked_at
+      FROM cloudflare_applications;
+    `);
+  } catch {
+    // View or table already exists
+  }
 }
+

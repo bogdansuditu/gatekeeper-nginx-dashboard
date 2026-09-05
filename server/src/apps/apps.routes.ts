@@ -17,13 +17,13 @@ export const appsRoutes: FastifyPluginAsync = async (fastify) => {
 
     const apps = db.prepare(`
       SELECT 
-        id, npm_host_id as npmHostId, domain_name as domainName,
+        id, source, source_id as npmHostId, domain_name as domainName,
         forward_scheme as forwardScheme, forward_host as forwardHost,
         forward_port as forwardPort, is_ssl as isSsl, is_enabled as isEnabled,
         custom_title as customTitle, custom_description as customDescription,
         favicon_path as faviconPath, last_known_status as status,
         last_response_time_ms as responseTimeMs, last_checked_at as lastCheckedAt
-      FROM npm_applications
+      FROM unified_applications
       WHERE is_enabled = 1
     `).all() as any[];
 
@@ -86,12 +86,21 @@ export const appsRoutes: FastifyPluginAsync = async (fastify) => {
     };
 
     if (customTitle !== undefined || customDescription !== undefined) {
-      db.prepare(`
+      const npmRes = db.prepare(`
         UPDATE npm_applications
         SET custom_title = coalesce(?, custom_title),
             custom_description = coalesce(?, custom_description)
         WHERE id = ?
       `).run(customTitle || null, customDescription || null, id);
+
+      if (npmRes.changes === 0) {
+        db.prepare(`
+          UPDATE cloudflare_applications
+          SET custom_title = coalesce(?, custom_title),
+              custom_description = coalesce(?, custom_description)
+          WHERE id = ?
+        `).run(customTitle || null, customDescription || null, id);
+      }
     }
 
     if (isHidden !== undefined) {
@@ -118,15 +127,21 @@ export const appsRoutes: FastifyPluginAsync = async (fastify) => {
     if (!cookie) return reply.status(401).send({ error: 'Unauthenticated' });
 
     const { id } = request.params as { id: string };
-    const app = db.prepare('SELECT * FROM npm_applications WHERE id = ?').get(id) as any;
+    let app = db.prepare('SELECT * FROM npm_applications WHERE id = ?').get(id) as any;
+    let sourceTable = 'npm_applications';
+    if (!app) {
+      app = db.prepare('SELECT * FROM cloudflare_applications WHERE id = ?').get(id) as any;
+      sourceTable = 'cloudflare_applications';
+    }
     if (!app) return reply.status(404).send({ error: 'Application not found' });
 
     const title = app.custom_title || app.domain_name.split('.')[0];
     const iconPath = await fetchAndCacheIcon(app.id, app.domain_name, app.is_ssl ? 'https' : app.forward_scheme, title);
-    db.prepare('UPDATE npm_applications SET favicon_path = ? WHERE id = ?').run(iconPath, app.id);
+    db.prepare(`UPDATE ${sourceTable} SET favicon_path = ? WHERE id = ?`).run(iconPath, app.id);
 
     return reply.send({ success: true, faviconPath: iconPath });
   });
+
 
   // Save Card Drag-and-Drop Order
   fastify.post('/api/v1/apps/order', async (request, reply) => {

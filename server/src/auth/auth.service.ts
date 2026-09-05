@@ -26,6 +26,10 @@ export interface UserPreferencesRecord {
   npm_endpoint: string | null;
   npm_identity: string | null;
   npm_secret_encrypted: string | null;
+  cf_account_id?: string | null;
+  cf_token_encrypted?: string | null;
+  cf_tunnel_id?: string | null;
+  cf_tunnel_name?: string | null;
   card_order: string | null;
   hidden_apps: string | null;
   show_analytics: number;
@@ -45,6 +49,10 @@ export interface SafeUser {
     npmEndpoint: string | null;
     npmIdentity: string | null;
     hasSavedNpmSecret: boolean;
+    cfAccountId: string | null;
+    cfTunnelId: string | null;
+    cfTunnelName: string | null;
+    hasSavedCfToken: boolean;
     cardOrder: string[];
     hiddenApps: string[];
     showAnalytics: boolean;
@@ -76,12 +84,17 @@ export function sanitizeUser(user: UserRecord, prefs?: UserPreferencesRecord | n
       npmEndpoint: prefs?.npm_endpoint || null,
       npmIdentity: prefs?.npm_identity || null,
       hasSavedNpmSecret: Boolean(prefs?.npm_secret_encrypted),
+      cfAccountId: prefs?.cf_account_id || null,
+      cfTunnelId: prefs?.cf_tunnel_id || null,
+      cfTunnelName: prefs?.cf_tunnel_name || null,
+      hasSavedCfToken: Boolean(prefs?.cf_token_encrypted),
       cardOrder,
       hiddenApps,
       showAnalytics: prefs ? Boolean(prefs.show_analytics) : true,
     },
   };
 }
+
 
 export function bootstrapAdminUser(): void {
   const countRow = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };

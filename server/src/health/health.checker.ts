@@ -16,7 +16,43 @@ const probeClient = axios.create({
   },
 });
 
-export async function checkHostHealth(app: { id: string; domain_name: string; is_ssl: number; forward_scheme: string }): Promise<{ status: string; latencyMs: number }> {
+export interface AppHealthTarget {
+  id: string;
+  source?: string;
+  domain_name: string;
+  is_ssl: number;
+  forward_scheme: string;
+  forward_host?: string;
+  forward_port?: number;
+}
+
+export function getNpmHost(): string | null {
+  const prefs = db.prepare(`
+    SELECT npm_endpoint FROM user_preferences
+    WHERE npm_endpoint IS NOT NULL AND npm_endpoint != ''
+    LIMIT 1
+  `).get() as { npm_endpoint: string } | undefined;
+
+  if (prefs?.npm_endpoint) {
+    try {
+      return new URL(prefs.npm_endpoint).hostname;
+    } catch {
+      // ignore
+    }
+  }
+
+  if (config.npmDefaultHost && config.npmDefaultHost !== 'http://nginx-proxy-manager:81') {
+    try {
+      return new URL(config.npmDefaultHost).hostname;
+    } catch {
+      // ignore
+    }
+  }
+
+  return null;
+}
+
+export async function checkHostHealth(app: AppHealthTarget, npmHost?: string | null): Promise<{ status: string; latencyMs: number }> {
   // If demo application in demo mode and unresolvable domain, simulate realistic metrics
   if (app.id.startsWith('demo-')) {
     if (app.id === 'demo-pihole') {
@@ -42,8 +78,9 @@ export async function checkHostHealth(app: { id: string; domain_name: string; is
   const url = `${scheme}://${app.domain_name}`;
   const start = Date.now();
 
+  // Tier 1: Direct hostname probe (standard path for public DNS, Cloudflare tunnels, and resolvable hosts)
   try {
-    const res = await probeClient.get(url);
+    const res = await probeClient.get(url, { maxRedirects: 0 });
     const latencyMs = Date.now() - start;
 
     if (res.status >= 200 && res.status < 400) {
@@ -57,28 +94,82 @@ export async function checkHostHealth(app: { id: string; domain_name: string; is
     }
     return { status: 'degraded', latencyMs };
   } catch (err: any) {
-    return { status: 'down', latencyMs: 0 };
+    // Continue to fallback tiers below
   }
+
+  // Tier 2: For NPM applications, probe via NPM reverse proxy IP with Host & SNI headers
+  // Resolves Docker DNS bridge isolation where homelab split-brain DNS is not in public DNS
+  if (app.source !== 'cloudflare' && npmHost) {
+    try {
+      const proxyPort = app.is_ssl ? 443 : 80;
+      const proxyUrl = `${app.is_ssl ? 'https' : 'http'}://${npmHost}:${proxyPort}`;
+      const res = await probeClient.get(proxyUrl, {
+        headers: { Host: app.domain_name },
+        httpsAgent: new https.Agent({
+          rejectUnauthorized: false,
+          servername: app.domain_name,
+        }),
+        maxRedirects: 0,
+      });
+      const latencyMs = Date.now() - start;
+
+      if (res.status >= 200 && res.status < 500) {
+        return { status: 'healthy', latencyMs };
+      }
+      if (res.status >= 500) {
+        return { status: 'down', latencyMs };
+      }
+    } catch {
+      // Continue to Tier 3
+    }
+  }
+
+  // Tier 3: Probe the direct upstream target host:port if available
+  if (app.forward_host && app.forward_port) {
+    try {
+      const targetUrl = `${app.forward_scheme || 'http'}://${app.forward_host}:${app.forward_port}`;
+      const res = await probeClient.get(targetUrl, { maxRedirects: 0 });
+      const latencyMs = Date.now() - start;
+
+      if (res.status >= 200 && res.status < 500) {
+        return { status: 'healthy', latencyMs };
+      }
+    } catch {
+      // All tiers failed
+    }
+  }
+
+  return { status: 'down', latencyMs: 0 };
 }
 
 export async function runHealthCheckCycle(): Promise<void> {
-  const apps = db.prepare('SELECT id, domain_name, is_ssl, forward_scheme FROM npm_applications WHERE is_enabled = 1').all() as any[];
+  const apps = db.prepare('SELECT id, source, domain_name, is_ssl, forward_scheme, forward_host, forward_port FROM unified_applications WHERE is_enabled = 1').all() as any[];
   if (apps.length === 0) return;
 
+  const npmHost = getNpmHost();
   let totalLatency = 0;
   let onlineCount = 0;
   let downCount = 0;
 
-  const updateStmt = db.prepare(`
+  const updateNpmStmt = db.prepare(`
     UPDATE npm_applications
+    SET last_known_status = ?, last_response_time_ms = ?, last_checked_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+  const updateCfStmt = db.prepare(`
+    UPDATE cloudflare_applications
     SET last_known_status = ?, last_response_time_ms = ?, last_checked_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `);
 
   const results = await Promise.allSettled(
     apps.map(async (app) => {
-      const res = await checkHostHealth(app);
-      updateStmt.run(res.status, res.latencyMs, app.id);
+      const res = await checkHostHealth(app, npmHost);
+      if (app.source === 'cloudflare') {
+        updateCfStmt.run(res.status, res.latencyMs, app.id);
+      } else {
+        updateNpmStmt.run(res.status, res.latencyMs, app.id);
+      }
       if (res.status === 'healthy') {
         onlineCount++;
         totalLatency += res.latencyMs;
@@ -87,6 +178,8 @@ export async function runHealthCheckCycle(): Promise<void> {
       }
     })
   );
+
+
 
   const totalCount = apps.length;
   const avgLatency = onlineCount > 0 ? Math.round(totalLatency / onlineCount) : 0;

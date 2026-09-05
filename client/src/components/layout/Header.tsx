@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, RefreshCw, Sun, Moon, ShieldCheck, ChevronDown, LogOut, Settings, Network, User } from 'lucide-react';
+import { Search, RefreshCw, Sun, Moon, ShieldCheck, ChevronDown, LogOut, Settings, Network, User, Cloud } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { HealthStats } from '../../types';
@@ -10,8 +10,9 @@ interface HeaderProps {
   healthStats: HealthStats | null;
   onManualSync: () => void;
   isSyncing: boolean;
-  onOpenSettings: (tab?: 'profile' | 'theme' | 'npm' | 'users') => void;
+  onOpenSettings: (tab?: 'profile' | 'theme' | 'npm' | 'cloudflare' | 'users') => void;
 }
+
 
 export const Header: React.FC<HeaderProps> = ({
   searchQuery,
@@ -158,6 +159,18 @@ export const Header: React.FC<HeaderProps> = ({
                   <Network className="w-4 h-4 text-text-muted" />
                   <span>NPM Upstream Integration</span>
                 </button>
+
+                <button
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    onOpenSettings('cloudflare');
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs font-medium text-text-secondary hover:text-white hover:bg-card-dark rounded-xl transition-colors flex items-center gap-2.5"
+                >
+                  <Cloud className="w-4 h-4 text-[#f38020]" />
+                  <span>Cloudflare Tunnels</span>
+                </button>
+
 
                 <button
                   onClick={() => {

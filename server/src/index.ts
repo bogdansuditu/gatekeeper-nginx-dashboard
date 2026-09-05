@@ -16,6 +16,8 @@ import { runHealthCheckCycle, seedInitialHealthHistory } from './health/health.c
 import { appsRoutes } from './apps/apps.routes.js';
 import { iconRoutes } from './icons/icon.routes.js';
 import { usersRoutes } from './users/users.routes.js';
+import { cloudflareRoutes } from './cloudflare/cloudflare.routes.js';
+import { syncCloudflareApps } from './cloudflare/cloudflare.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,6 +53,7 @@ async function startServer() {
   // 6. Register API Route Modules
   await server.register(authRoutes);
   await server.register(npmRoutes);
+  await server.register(cloudflareRoutes);
   await server.register(healthRoutes);
   await server.register(appsRoutes);
   await server.register(iconRoutes);
@@ -86,6 +89,7 @@ async function startServer() {
   console.log(`[Gatekeeper] Starting NPM sync interval (${config.syncIntervalMinutes}m)...`);
   setInterval(() => {
     syncNpmHosts().catch((err) => console.error('[Gatekeeper] Sync error:', err.message));
+    syncCloudflareApps().catch((err) => console.error('[Gatekeeper] CF Sync error:', err.message));
   }, config.syncIntervalMinutes * 60 * 1000);
 
   console.log(`[Gatekeeper] Starting health monitor interval (${config.healthcheckIntervalSeconds}s)...`);
@@ -99,10 +103,12 @@ async function startServer() {
     console.log(`[Gatekeeper] Server successfully listening at http://${config.host}:${config.port}`);
     // Run initial host synchronization
     syncNpmHosts().catch((err) => console.error('[Gatekeeper] Initial sync error:', err.message));
+    syncCloudflareApps().catch((err) => console.error('[Gatekeeper] Initial CF sync error:', err.message));
   } catch (err) {
     server.log.error(err);
     process.exit(1);
   }
 }
+
 
 startServer();

@@ -2,7 +2,6 @@ import React from 'react';
 import { ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
 import { MetricKpiCard } from './MetricKpiCard';
 import { LatencyWaveChart } from './LatencyWaveChart';
-import { HostRadarChart } from './HostRadarChart';
 import { HealthDonutGauges } from './HealthDonutGauges';
 import { HealthStats, HealthSample } from '../../types';
 
@@ -88,8 +87,7 @@ export const CollapsiblePanel: React.FC<CollapsiblePanelProps> = ({
             <div className="lg:col-span-8 flex flex-col">
               <LatencyWaveChart samples={samples} />
             </div>
-            <div className="lg:col-span-4 flex flex-col gap-6">
-              <HostRadarChart stats={stats} />
+            <div className="lg:col-span-4 flex flex-col">
               <HealthDonutGauges stats={stats} />
             </div>
           </div>

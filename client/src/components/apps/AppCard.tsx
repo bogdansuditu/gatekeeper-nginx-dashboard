@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ExternalLink, MoreVertical, GripVertical, Edit2, RotateCw, EyeOff, Lock, Globe } from 'lucide-react';
+import { ExternalLink, MoreVertical, GripVertical, Edit2, RotateCw, EyeOff, Lock, Globe, Cloud, Network } from 'lucide-react';
 import { AppItem } from '../../types';
+
 
 interface AppCardProps {
   app: AppItem;
@@ -75,17 +76,17 @@ export const AppCard: React.FC<AppCardProps> = ({ app, onEdit, onRefetchIcon, on
 
           {/* Application Name & Internal Target */}
           <div className="flex flex-col min-w-0">
-            <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider flex items-center gap-1 leading-none mb-0.5">
+            <h3 className="text-sm font-bold text-text-primary truncate group-hover:text-accent-hover transition-colors leading-tight mb-0.5">
+              {app.customTitle || app.domainName.split('.')[0]}
+            </h3>
+            <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider flex items-center gap-1 leading-none">
               {app.isSsl ? <Lock className="w-2.5 h-2.5 text-status-healthy" /> : <Globe className="w-2.5 h-2.5 text-text-muted" />}
               <span className="truncate">{app.domainName}</span>
             </span>
-            <h3 className="text-sm font-bold text-text-primary truncate group-hover:text-accent-hover transition-colors leading-tight">
-              {app.customTitle || app.domainName.split('.')[0]}
-            </h3>
           </div>
         </div>
 
-        {/* Action Menu */}
+        {/* Top Right: Action Menu */}
         <div className="relative shrink-0">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
@@ -141,9 +142,29 @@ export const AppCard: React.FC<AppCardProps> = ({ app, onEdit, onRefetchIcon, on
         </div>
       </div>
 
-      {/* Description / Host Details */}
-      <div className="mt-1.5 mb-2 text-xs text-text-secondary line-clamp-1 truncate">
-        {app.customDescription || `Forwarded to: ${app.forwardHost}:${app.forwardPort}`}
+      {/* Description / Host Details with Provider Badge */}
+      <div className="mt-1.5 mb-2 flex items-center justify-between gap-2 text-xs text-text-secondary min-w-0">
+        <span className="truncate">
+          {app.customDescription || `Forwarded to: ${app.forwardHost}:${app.forwardPort}`}
+        </span>
+
+        {app.source === 'cloudflare' ? (
+          <span
+            title="Discovered via Cloudflare Tunnel"
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold text-[#f38020] bg-[#f38020]/10 border border-[#f38020]/25 shrink-0 select-none"
+          >
+            <Cloud className="w-2.5 h-2.5 shrink-0" />
+            <span>CF</span>
+          </span>
+        ) : (
+          <span
+            title="Managed via Nginx Proxy Manager"
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/25 shrink-0 select-none"
+          >
+            <Network className="w-2.5 h-2.5 shrink-0" />
+            <span>NPM</span>
+          </span>
+        )}
       </div>
 
       {/* Card Footer: Status Dot, Latency, Launch Button */}

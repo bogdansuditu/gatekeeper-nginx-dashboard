@@ -17,7 +17,7 @@ export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'analytics' | 'apps' | 'users' | 'settings'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'profile' | 'theme' | 'npm' | 'users'>('profile');
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'profile' | 'theme' | 'npm' | 'cloudflare' | 'users'>('profile');
   const [editingApp, setEditingApp] = useState<AppItem | null>(null);
 
   // Data States
@@ -91,16 +91,20 @@ export const App: React.FC = () => {
     }
   }, [user]);
 
-  // Handle Manual NPM Resync
+  // Handle Manual Resync (Both NPM and Cloudflare Tunnels)
   const handleManualSync = async () => {
     setIsSyncing(true);
     try {
-      await fetch('/api/v1/npm/sync', { method: 'POST', credentials: 'include' });
+      await Promise.allSettled([
+        fetch('/api/v1/npm/sync', { method: 'POST', credentials: 'include' }),
+        fetch('/api/v1/cloudflare/sync', { method: 'POST', credentials: 'include' }),
+      ]);
       await Promise.all([fetchApps(), fetchTelemetry()]);
     } catch {} finally {
       setIsSyncing(false);
     }
   };
+
 
   // Handle Card Drag-and-Drop Reordering
   const handleReorder = async (newApps: AppItem[]) => {
