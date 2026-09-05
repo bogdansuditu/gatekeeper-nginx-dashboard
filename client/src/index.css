@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root, html.dark {
+  color-scheme: dark;
+  --bg-canvas: 20 21 44;        /* #14152c Indigo Slate Canvas */
+  --bg-surface: 28 30 61;       /* #1c1e3d Surface Elevated */
+  --bg-card: 35 38 82;          /* #232652 Card */
+  --bg-card-hover: 43 47 99;    /* #2b2f63 Card Hover */
+  --border-subtle: 47 51 102;   /* #2f3366 Border */
+  --border-focus: 83 100 240;   /* #5364f0 Focus Border */
+  --text-primary: 255 255 255;  /* #ffffff */
+  --text-secondary: 140 148 191;/* #8c94bf */
+  --text-muted: 93 101 142;     /* #5d658e */
+  --accent-primary: 83 100 240; /* #5364f0 */
+  --accent-hover: 108 124 247;  /* #6c7cf7 */
+  --status-healthy: 16 185 129; /* #10b981 */
+  --status-warning: 245 158 11; /* #f59e0b */
+  --status-critical: 239 68 68; /* #ef4444 */
+}
+
+html.light {
+  color-scheme: light;
+  --bg-canvas: 244 245 250;     /* #f4f5fa Slate Breeze Canvas */
+  --bg-surface: 233 236 246;    /* #e9ecf6 Surface Elevated */
+  --bg-card: 255 255 255;       /* #ffffff Crisp White Card */
+  --bg-card-hover: 248 249 255; /* #f8f9ff Card Hover */
+  --border-subtle: 220 225 240; /* #dce1f0 Subtle Border */
+  --border-focus: 83 100 240;   /* #5364f0 */
+  --text-primary: 18 20 38;     /* #121426 Deep Slate Text */
+  --text-secondary: 88 96 126;  /* #58607e Muted Slate */
+  --text-muted: 141 150 179;    /* #8d96b3 Secondary Muted */
+  --accent-primary: 83 100 240; /* #5364f0 */
+  --accent-hover: 66 81 204;    /* #4251cc */
+  --status-healthy: 5 150 105;  /* #059669 */
+  --status-warning: 217 119 6;  /* #d97706 */
+  --status-critical: 220 38 38; /* #dc2626 */
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: rgb(var(--bg-canvas));
+  color: rgb(var(--text-primary));
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Modern subtle scrollbar adapting to current theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border-subtle));
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--accent-primary));
+}
+
+/* Card hover transitions */
+.dashboard-card {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -10px rgba(83, 100, 240, 0.25);
+}
+
+html.light .dashboard-card {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+}
+
+html.light .dashboard-card:hover {
+  box-shadow: 0 12px 24px -10px rgba(83, 100, 240, 0.18), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+}
+
+/* Light mode text & element adaptations */
+html.light h1,
+html.light h2,
+html.light h3,
+html.light h4,
+html.light h5,
+html.light h6 {
+  color: rgb(var(--text-primary));
+}
+
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light select,
+html.light textarea {
+  color: rgb(var(--text-primary));
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: rgb(var(--text-muted));
+}
+
+html.light select option {
+  background-color: rgb(var(--bg-card));
+  color: rgb(var(--text-primary));
+}
+
+html.light .hover\:text-white:hover {
+  color: rgb(var(--text-primary)) !important;
+}
+
+html.light .text-white:not([class*="bg-accent"]):not([class*="bg-status"]):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-amber"]):not([class*="bg-gradient"]):not(button[class*="bg-"]):not(span[class*="bg-gradient"]):not(.badge-text) {
+  color: rgb(var(--text-primary));
+}
+
+/* Pulsing online/down indicators */
+@keyframes status-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.15);
+  }
+}
+
+.pulse-healthy {
+  animation: status-pulse 2.5s infinite ease-in-out;
+}
+
+.pulse-critical {
+  animation: status-pulse 1.2s infinite ease-in-out;
+}

@@ -1,0 +1,35 @@
+services:
+  gatekeeper-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gatekeeper-dashboard:latest
+    container_name: gatekeeper_dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - DATABASE_PATH=/data/gatekeeper.sqlite
+      - CACHE_DIR=/data/cache
+      - JWT_SECRET=gatekeeper_ultra_secure_jwt_secret_change_me_in_prod_2026
+      # Initial Admin User Auto-Provisioning
+      - INITIAL_ADMIN_EMAIL=admin@example.com
+      - INITIAL_ADMIN_PASSWORD=adminpassword
+      # Demo Data Fallback when NPM is not configured
+      - ENABLE_DEMO_DATA=true
+      # Permissive SSL for Homelab Services
+      - STRICT_SSL=false
+      # Optional Global Upstream Nginx Proxy Manager Connection (leave empty if configuring in UI)
+      - NPM_DEFAULT_HOST=
+      - NPM_DEFAULT_USER=
+      - NPM_DEFAULT_PASS=
+      - SYNC_INTERVAL_MINUTES=5
+      - HEALTHCHECK_INTERVAL_SECONDS=60
+      - NPM_TIMEOUT_MS=15000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./dashboard-data:/data
