@@ -247,7 +247,7 @@ export const App: React.FC = () => {
           }}
         />
 
-        <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto overflow-y-auto">
+        <main className="flex-1 p-6 md:p-8 max-w-[1720px] w-full mx-auto overflow-y-auto">
           {/* Top Collapsible Analytics Section matching sample_dashboard.png */}
           {(currentTab === 'dashboard' || currentTab === 'analytics') && (
             <CollapsiblePanel

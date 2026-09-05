@@ -179,37 +179,37 @@ export const AppGrid: React.FC<AppGridProps> = ({
   return (
     <section className="flex flex-col gap-6">
       {/* Grid Subheader, Grouping Selector & Filters */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Layers className="w-5 h-5 text-accent-primary" />
-          <h2 className="text-lg font-bold text-text-primary tracking-wide">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <Layers className="w-5 h-5 text-accent-primary shrink-0" />
+          <h2 className="text-lg font-bold text-text-primary tracking-wide shrink-0">
             Discovered Applications & Proxy Portals
           </h2>
-          <span className="text-xs bg-surface-dark border border-border-subtle px-2.5 py-0.5 rounded-full text-text-secondary font-semibold">
+          <span className="text-xs bg-surface-dark border border-border-subtle px-2.5 py-0.5 rounded-full text-text-secondary font-semibold shrink-0">
             {filteredApps.length} active
           </span>
           {groupBy === 'server' && serverGroups && (
-            <span className="text-xs bg-accent-primary/10 border border-accent-primary/25 px-2.5 py-0.5 rounded-full text-accent-hover font-semibold">
+            <span className="text-xs bg-accent-primary/10 border border-accent-primary/25 px-2.5 py-0.5 rounded-full text-accent-hover font-semibold shrink-0">
               {serverGroups.length} server{serverGroups.length !== 1 ? 's' : ''}
             </span>
           )}
           {groupBy === 'provider' && providerGroups && (
-            <span className="text-xs bg-accent-primary/10 border border-accent-primary/25 px-2.5 py-0.5 rounded-full text-accent-hover font-semibold">
+            <span className="text-xs bg-accent-primary/10 border border-accent-primary/25 px-2.5 py-0.5 rounded-full text-accent-hover font-semibold shrink-0">
               {providerGroups.length} provider{providerGroups.length !== 1 ? 's' : ''}
             </span>
           )}
         </div>
 
         {/* Controls: Grouping Selector and Status Filter Pills */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap shrink-0">
           {/* Grouping Selector: None vs By Server vs By Provider */}
-          <div className="flex items-center gap-1.5 bg-surface-dark border border-border-subtle p-1 rounded-xl text-xs">
+          <div className="flex items-center gap-1 bg-surface-dark border border-border-subtle p-1 rounded-xl text-xs shrink-0">
             <span className="text-[10px] uppercase font-bold text-text-muted px-2 select-none tracking-wider">
               Grouping:
             </span>
             <button
               onClick={() => handleSetGroupBy('none')}
-              className={`px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
                 groupBy === 'none'
                   ? 'bg-card-dark text-text-primary shadow-sm border border-border-subtle'
                   : 'text-text-muted hover:text-white'
@@ -219,7 +219,7 @@ export const AppGrid: React.FC<AppGridProps> = ({
             </button>
             <button
               onClick={() => handleSetGroupBy('server')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all ${
                 groupBy === 'server'
                   ? 'bg-card-dark text-text-primary shadow-sm border border-border-subtle'
                   : 'text-text-muted hover:text-white'
@@ -230,7 +230,7 @@ export const AppGrid: React.FC<AppGridProps> = ({
             </button>
             <button
               onClick={() => handleSetGroupBy('provider')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-all ${
                 groupBy === 'provider'
                   ? 'bg-card-dark text-text-primary shadow-sm border border-border-subtle'
                   : 'text-text-muted hover:text-white'
@@ -242,10 +242,10 @@ export const AppGrid: React.FC<AppGridProps> = ({
           </div>
 
           {/* Status Filter Pills: All Services, Online, Offline */}
-          <div className="flex items-center gap-1.5 bg-surface-dark border border-border-subtle p-1 rounded-xl text-xs">
+          <div className="flex items-center gap-1 bg-surface-dark border border-border-subtle p-1 rounded-xl text-xs shrink-0">
             <button
               onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
                 statusFilter === 'all'
                   ? 'bg-card-dark text-text-primary shadow-sm border border-border-subtle'
                   : 'text-text-muted hover:text-white'
@@ -255,7 +255,7 @@ export const AppGrid: React.FC<AppGridProps> = ({
             </button>
             <button
               onClick={() => setStatusFilter('online')}
-              className={`flex items-center gap-1 px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium transition-all ${
                 statusFilter === 'online'
                   ? 'bg-status-healthy/20 text-status-healthy font-bold'
                   : 'text-text-muted hover:text-white'
@@ -266,7 +266,7 @@ export const AppGrid: React.FC<AppGridProps> = ({
             </button>
             <button
               onClick={() => setStatusFilter('down')}
-              className={`flex items-center gap-1 px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium transition-all ${
                 statusFilter === 'down'
                   ? 'bg-status-critical/20 text-status-critical font-bold'
                   : 'text-text-muted hover:text-white'
@@ -345,7 +345,7 @@ export const AppGrid: React.FC<AppGridProps> = ({
               </div>
 
               {/* Grid of Applications for this Server */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
                 {group.apps.map((app) => (
                   <AppCard
                     key={app.id}
@@ -417,7 +417,7 @@ export const AppGrid: React.FC<AppGridProps> = ({
                 </div>
 
                 {/* Grid of Applications for this Provider */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
                   {group.apps.map((app) => (
                     <AppCard
                       key={app.id}
@@ -436,7 +436,7 @@ export const AppGrid: React.FC<AppGridProps> = ({
         /* Standard Flat Reorderable Grid (None) */
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={filteredApps.map((a) => a.id)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
               {filteredApps.map((app) => (
                 <AppCard
                   key={app.id}
