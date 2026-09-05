@@ -37,8 +37,8 @@ RUN npm prune --omit=dev
 # =========================================================
 FROM node:22-alpine AS runner
 
-# Install dumb-init or sqlite runtime libraries if needed
-RUN apk add --no-cache dumb-init
+# Install dumb-init and su-exec to safely fix volume permissions and drop to node user
+RUN apk add --no-cache dumb-init su-exec
 
 WORKDIR /app
 
@@ -48,20 +48,18 @@ ENV HOST=0.0.0.0
 ENV DATABASE_PATH=/data/gatekeeper.sqlite
 ENV CACHE_DIR=/data/cache
 
-# Create data volume directory and set ownership for built-in node user (UID 1000)
-RUN mkdir -p /data/cache/favicons /data/avatars && \
-    chown -R node:node /data /app
-
 # Copy built application and production node_modules from builder
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/package.json ./package.json
 COPY --from=builder --chown=node:node /app/server ./server
 
-USER node
+# Copy entrypoint script to automatically handle volume permissions
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 VOLUME ["/data"]
 
 EXPOSE 3000
 
-ENTRYPOINT ["dumb-init", "--"]
+ENTRYPOINT ["dumb-init", "--", "docker-entrypoint.sh"]
 CMD ["node", "server/dist/index.js"]

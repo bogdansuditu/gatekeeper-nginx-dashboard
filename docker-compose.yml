@@ -35,4 +35,4 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./dashboard-data:/data
+      - "${DATA_DIR:-./dashboard-data}:/data"
